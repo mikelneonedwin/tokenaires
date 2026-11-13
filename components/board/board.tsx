@@ -1,11 +1,12 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoardParams } from "@/lib/api/boards";
 import { boardQueryString, cleanSearch, readBoardParams, searchPushed, searchSyncFrom, searchUrlChanged } from "@/lib/board-params";
-import { useBoard } from "@/hooks/use-board";
+import { boardQueryOptions, useBoard } from "@/hooks/use-board";
 import { BoardControls } from "./board-controls";
 import { BoardEmpty } from "./board-empty";
 import { BoardError } from "./board-error";
@@ -17,18 +18,33 @@ import { TopThree } from "./top-three";
 const SEARCH_DELAY_MS = 300;
 
 export function Board() {
-  const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
   const params = readBoardParams(search);
   const { data, isPending, isError, refetch, isFetching } = useBoard(params);
+  const queryClient = useQueryClient();
+  const sectionRef = useRef<HTMLElement>(null);
 
   const update = useCallback(
     (next: Partial<BoardParams>) => {
       const suffix = boardQueryString({ ...readBoardParams(search), page: 1, ...next });
-      router.replace(suffix ? `${pathname}?${suffix}` : pathname, { scroll: false });
+      const url = suffix ? `${pathname}?${suffix}` : pathname;
+      if (next.page === undefined) {
+        window.history.replaceState(null, "", url);
+        return;
+      }
+      window.history.pushState(null, "", url);
+      const section = sectionRef.current;
+      if (!section) return;
+      const offset = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      if (section.getBoundingClientRect().top < offset) section.scrollIntoView({ block: "start" });
     },
-    [pathname, router, search],
+    [pathname, search],
+  );
+
+  const prefetchPage = useCallback(
+    (page: number) => void queryClient.prefetchQuery(boardQueryOptions({ ...readBoardParams(search), page })),
+    [queryClient, search],
   );
 
   const [sync, setSync] = useState(() => searchSyncFrom(params.q));
@@ -66,7 +82,7 @@ export function Board() {
   const leader = data?.leaderTokens ?? 0;
 
   return (
-    <section aria-label="Rich list" className="panel p-3 sm:p-5">
+    <section ref={sectionRef} aria-label="Rich list" className="panel p-3 sm:p-5">
       <BoardControls
         period={params.period}
         source={params.source}
@@ -114,7 +130,7 @@ export function Board() {
                 </ol>
               </div>
             )}
-            <BoardPagination page={data.page} pageSize={data.pageSize} total={data.totalEntries} onPageChange={(page) => update({ page })} />
+            <BoardPagination page={data.page} pageSize={data.pageSize} total={data.totalEntries} onPageChange={(page) => update({ page })} onPrefetch={prefetchPage} />
           </>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { AltArrowDownIcon, CheckReadIcon } from "@solar-icons/react/linear";
+import { AltArrowDownIcon, AltArrowUpIcon, CheckReadIcon } from "@solar-icons/react/linear";
 import { cn } from "@/lib/utils";
 
 export interface SelectOption<T extends string> {
@@ -50,9 +50,12 @@ export function Select<T extends string>({ value, onValueChange, options, classN
           sideOffset={6}
           collisionPadding={16}
           align="end"
-          className="z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel p-1 text-foreground shadow-[0_16px_40px_hsl(0_0%_0%/0.3)]"
+          className="z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel p-1 text-foreground shadow-[0_16px_40px_hsl(0_0%_0%/0.3)]"
         >
-          <SelectPrimitive.Viewport>
+          <SelectPrimitive.ScrollUpButton className="flex cursor-default items-center justify-center py-1 text-t3 hover:text-foreground">
+            <AltArrowUpIcon className="size-3.5" aria-hidden="true" />
+          </SelectPrimitive.ScrollUpButton>
+          <SelectPrimitive.Viewport className="max-h-[min(24rem,calc(var(--radix-select-content-available-height)-2rem))]">
             {options.map((option) => (
               <SelectPrimitive.Item
                 key={option.value}
@@ -67,6 +70,9 @@ export function Select<T extends string>({ value, onValueChange, options, classN
               </SelectPrimitive.Item>
             ))}
           </SelectPrimitive.Viewport>
+          <SelectPrimitive.ScrollDownButton className="flex cursor-default items-center justify-center py-1 text-t3 hover:text-foreground">
+            <AltArrowDownIcon className="size-3.5" aria-hidden="true" />
+          </SelectPrimitive.ScrollDownButton>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     </SelectPrimitive.Root>
