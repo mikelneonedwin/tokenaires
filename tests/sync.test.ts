@@ -186,6 +186,24 @@ describe('login and sync against a fake API', () => {
     expect(error).not.toContain('Run tokenaires login again');
   });
 
+  it('ignores cursors for agent sources this CLI version does not know', async () => {
+    await login(ctx);
+    server.state.cursors = [
+      { source: 'claude-code', lastOccurredAt: '2026-11-01T00:00:00Z' },
+      { source: 'future-agent' as unknown as 'claude-code', lastOccurredAt: '2026-11-02T00:00:00Z' },
+    ];
+    expect(await runCli(ctx, ['sync', '--quiet'])).toBe(0);
+  });
+
+  it('fails validation when a known cursor has an invalid timestamp', async () => {
+    await login(ctx);
+    server.state.cursors = [
+      { source: 'claude-code', lastOccurredAt: 'not-a-date' },
+    ];
+    expect(await runCli(ctx, ['sync', '--quiet'])).toBe(1);
+    expect(ctx.errors.join('\n')).toContain('Tokenaires sent a response this version does not understand');
+  });
+
   it('says so when sync runs without a login', async () => {
     expect(await runCli(ctx, ['sync'])).toBe(1);
     expect(ctx.errors.join('\n')).toContain('You are not logged in. Run tokenaires login first.');

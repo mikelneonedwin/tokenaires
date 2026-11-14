@@ -92,4 +92,121 @@ describe('schedule', () => {
     await schedule(every3, 'on', { hours: 3 });
     expect(every3.lines.join('\n')).toContain('0 */3 * * * /usr/local/bin/node');
   });
+
+  it('creates a scheduled task on Windows with schtasks', async () => {
+    const ctx = testContext({
+      home,
+      env: {},
+      platform: 'win32',
+      nodePath: 'C:\\Program Files\\nodejs\\node.exe',
+      scriptPath: 'C:\\Users\\User\\AppData\\Roaming\\npm\\node_modules\\tokenaires\\dist\\cli.js',
+    });
+    await schedule(ctx, 'on');
+    expect(ctx.commands).toEqual([
+      {
+        command: 'schtasks',
+        args: [
+          '/create',
+          '/tn',
+          'com.tokenaires.sync',
+          '/tr',
+          '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\User\\AppData\\Roaming\\npm\\node_modules\\tokenaires\\dist\\cli.js" sync --quiet',
+          '/sc',
+          'HOURLY',
+          '/mo',
+          '6',
+          '/f',
+        ],
+      },
+    ]);
+    expect(ctx.lines.join('\n')).toContain('Tokenaires will sync every 6 hours.');
+    expect(ctx.lines.join('\n')).toContain('Task name: com.tokenaires.sync');
+  });
+
+  it('schedules daily on Windows when hours is 24', async () => {
+    const ctx = testContext({
+      home,
+      env: {},
+      platform: 'win32',
+      nodePath: 'C:\\node.exe',
+      scriptPath: 'C:\\tokenaires\\dist\\cli.js',
+    });
+    await schedule(ctx, 'on', { hours: 24 });
+    expect(ctx.commands).toEqual([
+      {
+        command: 'schtasks',
+        args: [
+          '/create',
+          '/tn',
+          'com.tokenaires.sync',
+          '/tr',
+          '"C:\\node.exe" "C:\\tokenaires\\dist\\cli.js" sync --quiet',
+          '/sc',
+          'DAILY',
+          '/f',
+        ],
+      },
+    ]);
+    expect(ctx.lines.join('\n')).toContain('Tokenaires will sync every day.');
+  });
+
+  it('removes scheduled task on Windows when turned off', async () => {
+    const ctx = testContext({ home, env: {}, platform: 'win32' });
+    await schedule(ctx, 'off');
+    expect(ctx.commands).toEqual([
+      { command: 'schtasks', args: ['/query', '/tn', 'com.tokenaires.sync'] },
+      { command: 'schtasks', args: ['/delete', '/tn', 'com.tokenaires.sync', '/f'] },
+    ]);
+    expect(ctx.lines.join('\n')).toContain('Schedule removed.');
+  });
+
+  it('reports when no schedule was set up on Windows', async () => {
+    const ctx = testContext({
+      home,
+      env: {},
+      platform: 'win32',
+      run: () =>
+        Promise.resolve({
+          code: 1,
+          stdout: '',
+          stderr: 'FEHLER: Die angegebene Aufgabe wurde nicht gefunden.',
+        }),
+    });
+    await schedule(ctx, 'off');
+    expect(ctx.lines.join('\n')).toContain('No schedule was set up.');
+  });
+
+  it('reports a schtasks create failure', async () => {
+    const ctx = testContext({
+      home,
+      env: {},
+      platform: 'win32',
+      run: () =>
+        Promise.resolve({
+          code: 1,
+          stdout: '',
+          stderr: 'ERROR: Access is denied.',
+        }),
+    });
+    await expect(schedule(ctx, 'on')).rejects.toThrow('schtasks could not create the scheduled task: ERROR: Access is denied.');
+  });
+
+  it('still schedules from a package runner cache, with a hint to install globally', async () => {
+    for (const [platform, runnerPath] of [
+      ['linux', '/home/user/.npm/_npx/a1b2c3/node_modules/tokenaires/dist/cli.js'],
+      ['linux', '/home/user/.cache/pnpm/dlx/123/node_modules/tokenaires/dist/cli.js'],
+      ['darwin', '/Users/user/.bun/install/cache/tokenaires@0.3.0/dist/cli.js'],
+      ['win32', 'C:\\Users\\User\\AppData\\Local\\npm-cache\\_npx\\abc\\node_modules\\tokenaires\\dist\\cli.js'],
+    ] as const) {
+      const ctx = testContext({ home, env: {}, platform, scriptPath: runnerPath });
+      await schedule(ctx, 'on');
+      expect(ctx.lines.join('\n')).toContain('npm i -g tokenaires');
+    }
+  });
+
+  it('gives no runner hint for a global install', async () => {
+    const ctx = testContext({ home, env: {}, platform: 'linux', scriptPath: '/usr/local/lib/node_modules/tokenaires/dist/cli.js' });
+    await schedule(ctx, 'on');
+    expect(ctx.lines.join('\n')).not.toContain('npm i -g tokenaires');
+  });
 });

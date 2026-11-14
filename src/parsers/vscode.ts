@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { UsageRecord } from '@tokenaires/contracts';
 import { child, count, epochTime, isObject, isoTime, parseObject, RECORD_ID_PATTERN, text, type JsonObject } from '@/parsers/json';
@@ -65,7 +65,8 @@ function recordFromUsage(
 
   const cacheReadTokens = count(usageObj, 'cacheReadTokens');
   const cacheWriteTokens = count(usageObj, 'cacheWriteTokens');
-  const directTotals = Array.isArray(usageObj.directTurnTokenTotals) ? usageObj.directTurnTokenTotals[0] : null;
+  const rawTotals: unknown = usageObj['directTurnTokenTotals'];
+  const directTotals: unknown = Array.isArray(rawTotals) && rawTotals.length > 0 ? rawTotals[0] : null;
   const reasoningTokens = isObject(directTotals) ? count(directTotals, 'reasoningTokens') : 0;
 
   const record: UsageRecord = {

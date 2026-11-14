@@ -91,6 +91,11 @@ export function kimiLegacySessionsRoot(env: NodeJS.ProcessEnv, home: string): st
   return join(override ? expandHome(override, home) : join(home, '.kimi'), 'sessions');
 }
 
+export function deepseekHarnessSessionsRoot(env: NodeJS.ProcessEnv, home: string): string {
+  const override = readEnv(env, ENV_KEYS.dshHome);
+  return join(override ? expandHome(override, home) : join(home, '.dsh'), 'sessions');
+}
+
 export function kiloDataDir(env: NodeJS.ProcessEnv, home: string): string {
   return join(readEnv(env, ENV_KEYS.xdgData) ?? join(home, '.local', 'share'), 'kilo');
 }
