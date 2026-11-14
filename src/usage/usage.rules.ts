@@ -22,6 +22,8 @@ export const RECORD_ID_PATTERNS: Record<AgentSource, RegExp> = {
   zcode: NATIVE_RECORD_ID,
   zed: NATIVE_RECORD_ID,
   vscode: NATIVE_RECORD_ID,
+  devin: NATIVE_RECORD_ID,
+  'deepseek-harness': NATIVE_RECORD_ID,
 };
 
 export const SOURCE_LAUNCH_DATES: Record<AgentSource, string> = {
@@ -39,6 +41,8 @@ export const SOURCE_LAUNCH_DATES: Record<AgentSource, string> = {
   zcode: '2026-06-28T00:00:00Z',
   zed: '2025-01-01T00:00:00Z',
   vscode: '2026-08-01T00:00:00Z',
+  devin: '2026-04-01T00:00:00Z',
+  'deepseek-harness': '2026-08-12T00:00:00Z',
 };
 
 export const MODEL_RELEASE_DATES: ReadonlyArray<{

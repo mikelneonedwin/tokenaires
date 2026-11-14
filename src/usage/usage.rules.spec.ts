@@ -56,6 +56,11 @@ describe('evaluateRecord', () => {
       'vscode',
       '3cb8431e-3d10-4455-a041-0cbe8166537d:request_96f44ac8-cbf1-4033-9835-5b6f3d5bcc95',
     ],
+    ['devin', 'devin-3f9a1c0e7b2d4e6f8a1b3c5d7e9f0a2b'],
+    [
+      'deepseek-harness',
+      'session-2c78dd9c-1095-4b96-9cd1-ee3dad5c7253:1e706ed0-3b3b-4c9d-ac27-a322069a1ade',
+    ],
   ] as const)('accepts a native %s record id', (source, recordId) => {
     expect(
       evaluateRecord({ ...base, source, recordId, model: 'gemini-3-pro' }, now),
@@ -99,6 +104,22 @@ describe('evaluateRecord', () => {
     expect(at('glm-5.3-flash', '2026-09-01T00:00:00Z')).toBeNull();
   });
 
+  it('refuses DeepSeek Harness records older than its developer preview', () => {
+    const harness = {
+      ...base,
+      source: 'deepseek-harness' as const,
+      recordId:
+        'session-2c78dd9c-1095-4b96-9cd1-ee3dad5c7253:1e706ed0-3b3b-4c9d-ac27-a322069a1ade',
+      model: 'deepseek-flash',
+    };
+    expect(
+      evaluateRecord({ ...harness, occurredAt: '2026-08-11T23:59:59Z' }, now),
+    ).toBe('before_source_launch');
+    expect(
+      evaluateRecord({ ...harness, occurredAt: '2026-08-12T00:00:00Z' }, now),
+    ).toBeNull();
+  });
+
   it('refuses Zed records older than its agent thread store', () => {
     const zed = {
       ...base,
@@ -128,6 +149,21 @@ describe('evaluateRecord', () => {
     ).toBe('before_source_launch');
     expect(
       evaluateRecord({ ...vscode, occurredAt: '2026-08-15T00:00:00Z' }, now),
+    ).toBeNull();
+  });
+
+  it('refuses Devin records older than its CLI early access', () => {
+    const devin = {
+      ...base,
+      source: 'devin' as const,
+      recordId: 'devin-3f9a1c0e7b2d4e6f8a1b3c5d7e9f0a2b',
+      model: 'swe-2-flash-medium',
+    };
+    expect(
+      evaluateRecord({ ...devin, occurredAt: '2026-03-31T23:59:59Z' }, now),
+    ).toBe('before_source_launch');
+    expect(
+      evaluateRecord({ ...devin, occurredAt: '2026-05-01T00:00:00Z' }, now),
     ).toBeNull();
   });
 
