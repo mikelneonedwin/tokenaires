@@ -45,7 +45,7 @@ export function vscodeConfigDirs(ctx: SourceContext): string[] {
   return [...new Set(linuxConfigDirs(ctx.home, readEnv(ctx.env, ENV_KEYS.xdgConfig)))];
 }
 
-async function remoteServerDirs(homes: string[]): Promise<string[]> {
+function remoteServerDirs(homes: string[]): string[] {
   const servers = ['.vscode-server', '.vscode-server-insiders'];
   return homes.flatMap((home) =>
     servers.map((server) => join(home, server, 'data')),
@@ -62,7 +62,7 @@ async function candidateAgentDirs(ctx: SourceContext): Promise<string[]> {
   const bases = vscodeConfigDirs(ctx);
   const homes = await wslHomes(ctx.platform);
   const linuxHomes = ctx.platform === 'win32' ? homes : [];
-  const remoteDirs = await remoteServerDirs([ctx.home, ...homes]);
+  const remoteDirs = remoteServerDirs([ctx.home, ...homes]);
 
   const allBases = [
     ...bases,

@@ -93,7 +93,7 @@ describe('VS Code parser', () => {
 
       const records = await parseVsCodeFile(dbPath);
       expect(records).toHaveLength(1);
-      expect(records?.[0].recordId).toBe('session-xyz:valid-turn');
+      expect(records?.[0]?.recordId).toBe('session-xyz:valid-turn');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
