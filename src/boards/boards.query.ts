@@ -16,16 +16,25 @@ export function sourceFilter(source: BoardSource): SQL {
 export function rankedTotals(period: BoardPeriod, source: BoardSource): SQL {
   return sql`
     select
-      u.id as user_id,
-      sum(d.total_tokens)::bigint as tokens,
-      sum(d.output_tokens)::bigint as output_tokens,
-      array_agg(distinct d.source) as sources,
-      row_number() over (order by sum(d.total_tokens) desc, u.created_at asc) as rank
-    from daily_usage d
-    join users u on u.id = d.user_id
-    where ${RANKABLE} and ${periodFilter(period)} and ${sourceFilter(source)}
-    group by u.id, u.created_at
-    having sum(d.total_tokens) > 0
+      s.user_id,
+      sum(s.source_tokens)::bigint as tokens,
+      sum(s.source_output_tokens)::bigint as output_tokens,
+      array_agg(s.source order by s.source_tokens desc, s.source asc) as sources,
+      row_number() over (order by sum(s.source_tokens) desc, s.created_at asc) as rank
+    from (
+      select
+        d.user_id,
+        u.created_at,
+        d.source,
+        sum(d.total_tokens)::bigint as source_tokens,
+        sum(d.output_tokens)::bigint as source_output_tokens
+      from daily_usage d
+      join users u on u.id = d.user_id
+      where ${RANKABLE} and ${periodFilter(period)} and ${sourceFilter(source)}
+      group by d.user_id, u.created_at, d.source
+    ) s
+    group by s.user_id, s.created_at
+    having sum(s.source_tokens) > 0
   `;
 }
 

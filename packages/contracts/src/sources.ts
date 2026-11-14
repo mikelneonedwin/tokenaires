@@ -15,6 +15,8 @@ export const AGENT_SOURCES = [
   'zcode',
   'zed',
   'vscode',
+  'devin',
+  'deepseek-harness',
 ] as const;
 
 export const AgentSourceSchema = z.enum(AGENT_SOURCES);
@@ -35,4 +37,6 @@ export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
   zcode: 'ZCode',
   zed: 'Zed',
   vscode: 'VS Code',
+  devin: 'Devin',
+  'deepseek-harness': 'DeepSeek Harness',
 };
