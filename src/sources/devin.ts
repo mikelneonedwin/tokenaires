@@ -1,12 +1,13 @@
 import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { ENV_KEYS, readEnv } from '@/config';
 import { wslHomes } from '@/files/wsl';
-import { parseDevinFile } from '@/parsers/devin';
+import { devinSignature, parseDevinFile } from '@/parsers/devin';
 import { expandHome } from '@/parsers/paths';
 import type { LogSource, SourceContext } from '@/sources/types';
 
 const TRANSCRIPTS_DIR = 'transcripts';
+const DB_NAME = 'sessions.db';
 
 function linuxDataDirs(home: string, xdgData: string | undefined): string[] {
   return [
@@ -53,11 +54,28 @@ async function isDir(path: string): Promise<boolean> {
   }
 }
 
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function dbCandidates(dir: string): string[] {
+  const candidates = [join(dir, DB_NAME), join(dir, TRANSCRIPTS_DIR, DB_NAME)];
+  if (basename(dir).toLowerCase().endsWith('.db')) candidates.push(dir);
+  return candidates;
+}
+
 export const devinSource: LogSource = {
   source: 'devin',
   async discover(ctx) {
     const found = new Set<string>();
     for (const dir of await candidateDirs(ctx)) {
+      for (const path of dbCandidates(dir)) {
+        if (await isFile(path)) found.add(path);
+      }
       const candidates = [join(dir, TRANSCRIPTS_DIR), dir];
       for (const target of candidates) {
         if (!(await isDir(target))) continue;
@@ -76,4 +94,5 @@ export const devinSource: LogSource = {
     return [...found];
   },
   parse: parseDevinFile,
+  signature: devinSignature,
 };

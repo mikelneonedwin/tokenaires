@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { devinRecordId, parseDevinContent, parseDevinFile } from '@/parsers/devin';
+import { devinDbRecordId, devinRecordId, parseDevinContent, parseDevinDb, parseDevinFile } from '@/parsers/devin';
 import { devinSource } from '@/sources/devin';
 import { makeDevinTranscript } from './fixtures/devin';
+import { createDevinDb } from './helpers/devin-db';
 
 describe('Devin parser', () => {
   it('parses ATIF trajectory and extracts usage records from agent steps', () => {
@@ -159,5 +160,101 @@ describe('Devin parser', () => {
     expect(parseDevinContent('not valid json')).toBeNull();
     expect(parseDevinContent('{}')).toBeNull();
     expect(parseDevinContent(JSON.stringify({ session_id: 'sess-1' }))).toEqual([]);
+  });
+
+  it('reads token metrics from sessions.db and dedupes message nodes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'devin-db-'));
+    const dbPath = join(dir, 'sessions.db');
+    try {
+      await createDevinDb(
+        dbPath,
+        [{ id: 'sheer-toad', model: 'swe-1-6-slow' }],
+        [
+          {
+            sessionId: 'sheer-toad',
+            nodeId: 1,
+            role: 'user',
+            messageId: 'user-message',
+            createdAt: '2026-11-14T21:00:00.000Z',
+          },
+          {
+            sessionId: 'sheer-toad',
+            nodeId: 2,
+            messageId: '01914dfc-c90c-4c77-9d06-4b110fe752c7',
+            requestId: '5a0f6239-7813-49a5-af16-39c33a175a8b',
+            generationModel: 'swe-2-flash-medium',
+            createdAt: '2026-11-14T21:27:45.907186900Z',
+            metrics: { inputTokens: 701, outputTokens: 1059, cacheReadTokens: 111360, cacheCreationTokens: null },
+          },
+          {
+            sessionId: 'sheer-toad',
+            nodeId: 3,
+            messageId: '01914dfc-c90c-4c77-9d06-4b110fe752c7',
+            requestId: '5a0f6239-7813-49a5-af16-39c33a175a8b',
+            generationModel: 'swe-2-flash-medium',
+            createdAt: '2026-11-14T21:27:45.907186900Z',
+            metrics: { inputTokens: 701, outputTokens: 1059, cacheReadTokens: 111360, cacheCreationTokens: null },
+          },
+          {
+            sessionId: 'sheer-toad',
+            nodeId: 4,
+            messageId: 'fallback-model-message',
+            createdAt: '2026-11-14T21:28:00.000Z',
+            metrics: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 7 },
+          },
+          {
+            sessionId: 'sheer-toad',
+            nodeId: 5,
+            messageId: 'no-metrics-message',
+            generationModel: 'swe-2-flash-medium',
+            createdAt: '2026-11-14T21:29:00.000Z',
+          },
+        ],
+      );
+
+      const records = await parseDevinDb(dbPath);
+      expect(records).toHaveLength(2);
+      expect(records?.[0]).toMatchObject({
+        source: 'devin',
+        recordId: devinDbRecordId('sheer-toad', '01914dfc-c90c-4c77-9d06-4b110fe752c7', '5a0f6239-7813-49a5-af16-39c33a175a8b', 2),
+        model: 'swe-2-flash-medium',
+        occurredAt: '2026-11-14T21:27:45.907Z',
+        inputTokens: 701,
+        outputTokens: 1059,
+        cacheReadTokens: 111360,
+        cacheWriteTokens: 0,
+      });
+      expect(records?.[1]).toMatchObject({ model: 'swe-1-6-slow', inputTokens: 10, outputTokens: 5, cacheWriteTokens: 7 });
+      expect(records?.[0]?.recordId).toMatch(/^devin:[0-9a-f]{32}$/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('discovers sessions.db through DEVIN_SESSIONS_DIR', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'devin-db-discover-'));
+    const dbPath = join(dir, 'sessions.db');
+    try {
+      await createDevinDb(
+        dbPath,
+        [{ id: 'db-session' }],
+        [
+          {
+            sessionId: 'db-session',
+            nodeId: 1,
+            messageId: 'db-message-id',
+            generationModel: 'swe-2-flash-medium',
+            createdAt: '2026-11-14T21:30:00.000Z',
+            metrics: { inputTokens: 20, outputTokens: 8 },
+          },
+        ],
+      );
+      const discovered = await devinSource.discover({ home: dir, env: { DEVIN_SESSIONS_DIR: dir }, platform: 'linux' });
+      expect(discovered).toContain(dbPath);
+      const parsed = await parseDevinFile(dbPath);
+      expect(parsed).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
